@@ -1,0 +1,40 @@
+# --- Secrets / env ---
+.env
+.env.local
+*.local
+
+# --- Original task brief (SumUp internal) ---
+Warsaw Accelerator 2026 – Home Task.docx.md
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# --- Data: keep committed seed, ignore raw collection dumps ---
+backend/data/raw/*
+!backend/data/raw/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

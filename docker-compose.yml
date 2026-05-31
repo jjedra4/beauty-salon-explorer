@@ -1,0 +1,51 @@
+# Warsaw Beauty Salon Explorer — full local stack.
+#
+#   docker compose up --build
+#
+# Brings up Postgres (with the pgvector extension), the FastAPI backend, and
+# the Next.js frontend. Configuration comes from the root `.env` file (copy
+# from `.env.example`); the app runs on committed seed data with no API keys.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-salon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-salon}
+      POSTGRES_DB: ${POSTGRES_DB:-salon}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-salon} -d ${POSTGRES_DB:-salon}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      # Override the host so the backend reaches Postgres over the compose network.
+      POSTGRES_HOST: db
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle at build time; the browser calls the
+        # backend via the host-published port, not the compose hostname.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

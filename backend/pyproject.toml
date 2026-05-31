@@ -1,0 +1,64 @@
+[project]
+name = "salon-explorer-backend"
+version = "0.1.0"
+description = "Warsaw Beauty Salon Explorer — FastAPI backend + AI data pipeline"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3",
+    "alembic>=1.14",
+    "openai>=1.54",
+    "httpx>=0.27",
+    "tenacity>=9.0",
+    "numpy>=2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app", "pipeline"]
+
+# ──────────────────────────────────────────────────────────────────────────
+# Tooling configuration (kept intentionally light, per project preference)
+# ──────────────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, pyupgrade, bugbear, comprehensions
+select = ["E", "F", "I", "UP", "B", "C4"]
+# B008: calling Depends()/Query() in argument defaults is the intended
+# FastAPI idiom, not a bug.
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests that require a running Postgres database",
+]

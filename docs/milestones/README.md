@@ -12,8 +12,8 @@ criteria pass.
 | M3 | [AI enrichment pipeline](M3-ai-enrichment.md)          | ✅ Done |
 | M4 | [Backend REST API](M4-rest-api.md)                     | ✅ Done |
 | M5 | [Semantic search API](M5-semantic-search.md)           | ✅ Done |
-| M6 | [Frontend: listing, filter, detail](M6-frontend-core.md) | ⏳ Planned |
-| M7 | [Frontend: NL search & edit](M7-frontend-search-edit.md) | ⏳ Planned |
-| M8 | [Hardening, docs & demo](M8-hardening.md)              | ⏳ Planned |
+| M6 | [Frontend: listing, filter, detail](M6-frontend-core.md) | ✅ Done |
+| M7 | [Frontend: NL search & edit](M7-frontend-search-edit.md) | ✅ Done |
+| M8 | [Hardening, docs & demo](M8-hardening.md)              | ✅ Done |
 
 **Legend:** ✅ Done · 🔨 In progress · ⏳ Planned

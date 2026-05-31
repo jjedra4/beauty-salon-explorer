@@ -9,6 +9,7 @@ semantic search can be enabled on the demo data with only an OpenAI key, no
 Google key or re-collection required.
 """
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai import get_embedding_client
@@ -109,11 +110,18 @@ def _resolve_services(service_repo: ServiceRepository, slugs: list[str]) -> list
 
 
 def main() -> None:
-    """CLI entrypoint: read the seed file and load it into the database."""
+    """CLI entrypoint: load the seed file unless the database is already seeded.
+
+    Skipping when salons already exist keeps container restarts fast and
+    preserves any edits made through the UI.
+    """
     configure_logging()
-    records = read_enriched_salons()
     with SessionLocal() as session:
-        load_seed(session, records, get_embedding_client())
+        existing = session.scalar(select(func.count(Salon.id)))
+        if existing:
+            logger.info("Database already has %d salons; skipping seed", existing)
+            return
+        load_seed(session, read_enriched_salons(), get_embedding_client())
 
 
 if __name__ == "__main__":

@@ -23,10 +23,39 @@ import app.models  # noqa: F401  (register models on Base.metadata)
 from app.core.database import Base, get_db
 from app.main import create_app
 
-TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL",
+# Tests run against a DEDICATED database, created on demand, so they never
+# touch the application's `salon` database (which holds demo/seed data).
+ADMIN_DATABASE_URL = os.environ.get(
+    "ADMIN_DATABASE_URL",
     "postgresql+psycopg://salon:salon@localhost:5432/salon",
 )
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+psycopg://salon:salon@localhost:5432/salon_test",
+)
+_TEST_DB_NAME = TEST_DATABASE_URL.rsplit("/", 1)[-1]
+
+
+def _ensure_test_database() -> None:
+    """Create the test database if it doesn't already exist.
+
+    Connects to the admin database with AUTOCOMMIT (``CREATE DATABASE`` cannot
+    run inside a transaction). Skips the integration suite if Postgres is
+    unreachable.
+    """
+    admin = create_engine(ADMIN_DATABASE_URL, isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as conn:
+            exists = conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :name"),
+                {"name": _TEST_DB_NAME},
+            ).scalar()
+            if not exists:
+                conn.execute(text(f'CREATE DATABASE "{_TEST_DB_NAME}"'))
+    except OperationalError:
+        pytest.skip("Postgres not available for integration tests")
+    finally:
+        admin.dispose()
 
 
 @pytest.fixture
@@ -37,16 +66,13 @@ def client() -> TestClient:
 
 @pytest.fixture(scope="session")
 def engine() -> Engine:
-    """Session-scoped engine with extensions + schema created once.
+    """Session-scoped engine for the dedicated test database.
 
-    Skips the entire integration suite if Postgres is unreachable.
+    Ensures the test database and required extensions exist, then (re)creates
+    a clean schema. Skips the integration suite if Postgres is unreachable.
     """
+    _ensure_test_database()
     eng = create_engine(TEST_DATABASE_URL)
-    try:
-        connection = eng.connect()
-    except OperationalError:
-        pytest.skip("Postgres not available for integration tests")
-    connection.close()
 
     with eng.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))

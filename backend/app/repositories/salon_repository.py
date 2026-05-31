@@ -84,14 +84,19 @@ class SalonRepository:
     ) -> list[tuple[Salon, float]]:
         """Fallback search: trigram/substring match on name + service text.
 
-        Ranks by trigram name similarity. Returns ``(salon, similarity)`` pairs.
+        Matches the query against name, district, and service text — including a
+        hyphenated form so a typed "hair coloring" still matches the
+        "hair-coloring" slug. Ranks by trigram name similarity.
         """
         pattern = f"%{query}%"
+        # Service slugs are hyphenated ("hair-coloring"); let spaced queries hit them.
+        slug_pattern = f"%{query.replace(' ', '-')}%"
         similarity = func.similarity(Salon.name, query).label("similarity")
         stmt = select(Salon, similarity).where(
             or_(
                 Salon.name.ilike(pattern),
                 Salon.raw_services_text.ilike(pattern),
+                Salon.raw_services_text.ilike(slug_pattern),
                 Salon.district.ilike(pattern),
                 func.similarity(Salon.name, query) > 0.1,
             )

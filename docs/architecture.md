@@ -52,22 +52,56 @@ it still serves the seed data and falls back to keyword search.
 
 ## Data model
 
-_Defined in M1._ The core entity is `Salon` (with provenance, location,
-contact, normalized services, an AI review summary, and a `pgvector` embedding)
-related many-to-many to a normalized `Service` taxonomy.
+```
+┌────────────────────────────┐         ┌──────────────────┐
+│ salons                      │         │ services         │
+│  id (PK)                    │  M : N  │  id (PK)         │
+│  source, source_id (uniq)   │◀───────▶│  slug (uniq)     │
+│  name, address, district    │ salon_  │  name            │
+│  latitude, longitude        │ services│  category        │
+│  phone, website             │         └──────────────────┘
+│  price_range, rating, …     │
+│  raw_services_text          │   raw, un-normalized text (transparency)
+│  review_summary             │   LLM-generated
+│  embedding  vector(1536)    │   pgvector — semantic search
+│  created_at, updated_at     │
+└────────────────────────────┘
+```
 
-## Key decisions
+- `Salon` carries **provenance** (`source` + `source_id`, unique together) so
+  records are traceable and dedup is auditable.
+- **Required** fields (name/address/district) are non-null; nice-to-haves
+  (phone/website/price/rating) are nullable and handled gracefully everywhere.
+- `embedding` is a `pgvector` column with an **HNSW** cosine index; `name` has a
+  **pg_trgm** GIN index for the keyword fallback.
+- Services are a **closed, normalized taxonomy** (`app/core/taxonomy.py`) joined
+  many-to-many, so "filter/edit by service" is a clean join, not text matching.
 
-_Captured inline as ADR-style notes as milestones land._
+## Key decisions (ADR-style notes)
 
 - **Data source — Google Places API (New):** official and licensed, with the
   richest field coverage (ratings, reviews, phone, website, geo) and a
-  reproducible query model. (M2)
-- **Postgres + pgvector:** keeps relational data and vector search in one
-  engine — simpler ops and a realistic path to scale. (M1/M5)
+  reproducible query model (district grid × query terms). Alternatives: OSM
+  (free but sparse), Booksy (most relevant but no public API / ToS concerns).
+- **Postgres + pgvector:** relational data and vector search in one engine —
+  simpler ops than a separate vector DB and a realistic path to scale.
+- **AI only where it adds value:** district and price are resolved
+  deterministically (reliable signals); the LLM is reserved for the genuinely
+  hard task (service classification) and summarization. Every AI feature has a
+  non-AI fallback, so the app runs with no keys.
+- **Dedup before enrich:** deduplication runs first so the costlier LLM steps
+  only process canonical records.
+- **Committed synthetic seed + auto-seed on startup:** guarantees a working,
+  keyless demo from a single `docker compose up`.
 
 ## Scaling to all of Poland
 
-_Expanded in M8._ The collector Strategy pattern lets us add a collector per
-region/city and fan out ingestion; pgvector + pagination keep reads bounded;
-enrichment is batched and cacheable to control LLM cost.
+- **More sources/regions = more collectors**, not rewrites — the
+  `SalonCollector` Strategy interface isolates source specifics; a city is just
+  a different set of district centroids / query terms.
+- **Batched, cacheable enrichment**: the pipeline is offline and idempotent;
+  LLM/embedding calls can be cached and batched to bound cost and time.
+- **Bounded reads**: `pgvector` (ANN index) + pagination keep list/search fast
+  as the dataset grows; the same schema and API serve any city unchanged.
+- **Operational path**: queue-based ingestion per region, scheduled refreshes,
+  and provenance-based incremental updates (re-enrich only changed records).

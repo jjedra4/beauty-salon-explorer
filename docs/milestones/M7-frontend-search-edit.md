@@ -1,6 +1,6 @@
 # M7 — Frontend: NL search & edit
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 
 ## Goal
 Complete the product loop: a prominent natural-language search bar and inline
@@ -20,9 +20,15 @@ editing of salon details — then prove the whole flow with an end-to-end test.
 Playwright config.
 
 ## Acceptance criteria
-- [ ] Typing a natural-language query returns ranked results in the UI.
-- [ ] Editing a salon saves and the change is visible after reload.
-- [ ] Playwright e2e passes locally and in CI.
+- [x] Typing a natural-language query returns ranked results in the UI, with a
+      Semantic/Keyword mode badge (e2e verified).
+- [x] Editing a salon saves and the change persists across reload (e2e verified).
+- [x] Playwright e2e passes (3 specs); 8 Vitest component tests pass.
+
+## Notes
+- The keyword fallback was improved to match hyphenated service slugs, so a
+  typed "hair coloring" matches the "hair-coloring" service even without AI.
+- The edit form uses SWR `mutate` to update the cached salon after saving.
 
 ## Tests
 Component tests for `SearchBar` and `EditSalonForm`; one Playwright e2e for the

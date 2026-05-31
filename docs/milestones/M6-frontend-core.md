@@ -1,6 +1,6 @@
 # M6 — Frontend: listing, filter, detail
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 
 ## Goal
 Build the core browse experience: a listing page with filters and a detail
@@ -22,9 +22,19 @@ view, consuming the REST API via a typed client.
 `FilterBar.tsx`, `SalonDetail.tsx`, `app/page.tsx`, `app/salons/[id]/page.tsx`.
 
 ## Acceptance criteria
-- [ ] Listing renders seeded salons with key info; pagination works.
-- [ ] Filtering by district and by service works against the API.
-- [ ] Clicking a salon opens its detail view with full info + AI summary.
+- [x] Listing renders seeded salons with key info; pagination works
+      (URL-driven, SWR; `next build` + lint clean; serves 200).
+- [x] Filtering by district and by service works against the API.
+- [x] Detail view shows full info + AI summary + maps link (route serves 200).
+- [~] Browser data-rendering is verified end-to-end by the M7 Playwright e2e.
+
+## Notes on what shipped
+- Client-side fetching with **SWR** (Docker-safe: the browser always calls
+  `NEXT_PUBLIC_API_BASE_URL`, avoiding SSR-in-container dual-URL issues).
+- Filter + pagination state lives in the URL (shareable, back-button works);
+  the `SalonBrowser` reads `useSearchParams` inside a `<Suspense>` boundary.
+- Typed client (`lib/api.ts` + `lib/types.ts`) mirrors the OpenAPI schema.
+- The NL search bar is added in M7 (the browser already has the seam for it).
 
 ## Tests
 Component tests (Vitest + Testing Library) for `SalonCard`, `FilterBar`, and

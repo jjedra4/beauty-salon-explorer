@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help up down logs build test test-backend test-frontend lint \
-        backend-dev frontend-dev migrate pipeline seed
+        backend-dev frontend-dev migrate pipeline seed e2e screenshots
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -32,14 +32,21 @@ frontend-dev: ## Run the Next.js dev server
 # ── Quality gates ──────────────────────────────────────────────────────────
 test: test-backend test-frontend ## Run all test suites
 
-test-backend: ## Run backend tests with coverage
-	cd backend && uv run pytest --cov=app --cov=pipeline
+test-backend: ## Run backend tests with coverage (gates at 80%)
+	cd backend && uv run pytest --cov=app --cov=pipeline --cov-fail-under=80
 
-test-frontend: ## Run frontend tests
-	cd frontend && npm test --if-present
+test-frontend: ## Run frontend unit tests
+	cd frontend && npm test
+
+e2e: ## Run Playwright end-to-end tests (brings the stack up first)
+	docker compose up -d --build
+	cd frontend && npx playwright install --with-deps chromium && npx playwright test
+
+screenshots: ## Capture demo screenshots (stack must be running)
+	cd frontend && node scripts/capture-screenshots.mjs
 
 lint: ## Lint and type-check both apps
-	cd backend && uv run ruff check . && uv run mypy app
+	cd backend && uv run ruff check . && uv run mypy app pipeline
 	cd frontend && npm run lint
 
 # ── Data pipeline (filled in across M1–M3) ─────────────────────────────────

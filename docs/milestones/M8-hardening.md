@@ -1,6 +1,6 @@
 # M8 — Hardening, docs & demo
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 
 ## Goal
 Turn a working app into a polished, reviewable deliverable: tests green,
@@ -19,10 +19,19 @@ coverage gated, docs complete, demo ready.
   `docker compose up` → working app on seed data.
 
 ## Acceptance criteria
-- [ ] Fresh clone + `cp .env.example .env` + `docker compose up` → fully working
-      app on seed data, no keys required.
-- [ ] `make test` and `make lint` pass; CI green end-to-end.
-- [ ] README answers all three required questions; architecture doc complete.
+- [x] Fresh `docker compose up` (clean volume) → entrypoint migrates + seeds 60
+      salons; `/health` ok, `/salons` total 60, frontend 200. No keys, no steps.
+- [x] `make test` and `make lint` pass; backend 88% coverage (gate 80%).
+- [x] README answers all three required questions; architecture doc complete
+      (data model, ADR notes, scale-to-Poland); demo screenshots captured.
+
+## Notes on what shipped
+- Tests use a dedicated `salon_test` database (auto-created), so they never
+  touch the app's data.
+- Backend Docker image runs `entrypoint.sh`: migrate → seed (idempotent) → API.
+- CI: backend (lint/type/test + 80% gate on a pgvector service), frontend
+  (lint/vitest/build), and a Playwright e2e job.
+- Demo screenshots in `docs/screenshots/` (captured via Playwright).
 
 ## Discussion readiness (maps to SumUp's questions)
 - **Why this source?** → Google Places (New): official, richest fields,

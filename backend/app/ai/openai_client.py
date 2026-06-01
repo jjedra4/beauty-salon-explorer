@@ -13,6 +13,10 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# OpenAI's embeddings endpoint accepts at most 2048 inputs per request; stay
+# comfortably under that (also keeps each request well within token limits).
+_EMBED_BATCH_SIZE = 1000
+
 
 class OpenAIClient:
     """Adapter over the OpenAI SDK for chat + embeddings."""
@@ -30,11 +34,13 @@ class OpenAIClient:
         self._embedding_model = embedding_model
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        """Embed a batch of texts in a single request."""
-        if not texts:
-            return []
-        response = self._client.embeddings.create(model=self._embedding_model, input=texts)
-        return [item.embedding for item in response.data]
+        """Embed texts, chunking into requests within the API's batch limit."""
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), _EMBED_BATCH_SIZE):
+            batch = texts[start : start + _EMBED_BATCH_SIZE]
+            response = self._client.embeddings.create(model=self._embedding_model, input=batch)
+            vectors.extend(item.embedding for item in response.data)
+        return vectors
 
     def parse(self, *, system: str, user: str, schema: type[SchemaT]) -> SchemaT:
         """Return a structured completion validated against ``schema``."""

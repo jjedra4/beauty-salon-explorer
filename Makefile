@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help up down logs build test test-backend test-frontend lint \
-        backend-dev frontend-dev migrate pipeline seed e2e screenshots
+        backend-dev frontend-dev migrate pipeline seed e2e screenshots ai-check places-check
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -37,6 +37,12 @@ test-backend: ## Run backend tests with coverage (gates at 80%)
 
 test-frontend: ## Run frontend unit tests
 	cd frontend && npm test
+
+ai-check: ## Smoke-test the real OpenAI models (needs OPENAI_API_KEY in .env)
+	cd backend && uv run pytest -m live tests/live/test_openai_live.py -v
+
+places-check: ## Smoke-test the real Google Places API (needs GOOGLE_MAPS_API_KEY in .env)
+	cd backend && uv run pytest -m live tests/live/test_google_places_live.py -v
 
 e2e: ## Run Playwright end-to-end tests (brings the stack up first)
 	docker compose up -d --build

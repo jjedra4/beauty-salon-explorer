@@ -56,9 +56,11 @@ warn_redundant_casts = true
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers"
+# `live` tests hit the real OpenAI API; exclude them from the default run.
+addopts = "-ra --strict-markers -m 'not live'"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "integration: tests that require a running Postgres database",
+    "live: tests that call the real OpenAI API (need OPENAI_API_KEY; run via `make ai-check`)",
 ]

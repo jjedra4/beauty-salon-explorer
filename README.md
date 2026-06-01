@@ -88,7 +88,7 @@ The committed seed is realistic **synthetic** data so the app runs offline.
 To use real salons and live semantic search, add keys to `.env`:
 
 ```bash
-OPENAI_API_KEY=sk-...          # enables LLM enrichment + semantic search
+OPENAI_API_KEY=...          # enables LLM enrichment + semantic search
 GOOGLE_MAPS_API_KEY=...        # enables live collection from Google Places
 ```
 

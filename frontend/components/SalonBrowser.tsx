@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
 import { FilterBar } from "@/components/FilterBar";
+import { Masonry } from "@/components/Masonry";
 import { Pagination } from "@/components/Pagination";
 import { SalonCard } from "@/components/SalonCard";
 import { StateMessage } from "@/components/StateMessage";
@@ -108,13 +109,14 @@ function BrowseResults({
   }
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Pinterest-style masonry: tiles keep their natural height and stack. */}
+      <Masonry gap="gap-4" columns={{ base: 1, sm: 2, lg: 3 }}>
         {state.data.items.map((salon, i) => (
           <div key={salon.id} className="rise" style={{ animationDelay: `${i * 45}ms` }}>
             <SalonCard salon={salon} />
           </div>
         ))}
-      </div>
+      </Masonry>
       <Pagination
         total={state.data.total}
         limit={state.data.limit}

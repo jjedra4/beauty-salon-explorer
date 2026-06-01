@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
+import { Masonry } from "@/components/Masonry";
 import { ModeBadge } from "@/components/ModeBadge";
 import { PromptSearch } from "@/components/PromptSearch";
 import { SalonTile } from "@/components/SalonTile";
@@ -72,7 +73,7 @@ export function SearchView() {
                 description="Try rephrasing, or browse the full directory."
               />
             ) : (
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <Masonry gap="gap-5" columns={{ base: 1, sm: 1, lg: 2 }}>
                 {data.items.map((salon, i) => (
                   <div key={salon.id} className="rise" style={{ animationDelay: `${i * 60}ms` }}>
                     <SalonTile
@@ -83,7 +84,7 @@ export function SearchView() {
                     />
                   </div>
                 ))}
-              </div>
+              </Masonry>
             )}
           </>
         )}

@@ -6,6 +6,7 @@ import useSWR from "swr";
 
 import { EditSalonForm } from "@/components/EditSalonForm";
 import { RatingStars } from "@/components/RatingStars";
+import { ReviewSummary } from "@/components/ReviewSummary";
 import { ServiceTags } from "@/components/ServiceTags";
 import { StateMessage } from "@/components/StateMessage";
 import { ApiError, getSalon } from "@/lib/api";
@@ -96,16 +97,7 @@ export function SalonDetailView({ salonId }: { salonId: number }) {
           <ServiceTags services={salon.services} max={20} />
         </header>
 
-        {salon.review_summary && (
-          <section className="border-b border-line/50 bg-neon/[0.04] p-7 sm:p-9">
-            <p className="mb-3 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-neon-soft">
-              <span aria-hidden>✦</span> AI review summary
-            </p>
-            <p className="whitespace-pre-line font-display text-lg leading-relaxed text-porcelain/90">
-              {salon.review_summary}
-            </p>
-          </section>
-        )}
+        {salon.review_summary && <ReviewSummary text={salon.review_summary} />}
 
         <dl className="grid grid-cols-1 gap-6 p-7 sm:grid-cols-2 sm:p-9">
           <Field label="Address">

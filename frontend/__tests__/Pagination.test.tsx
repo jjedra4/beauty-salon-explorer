@@ -16,7 +16,7 @@ describe("Pagination", () => {
     const onChange = vi.fn();
     render(<Pagination total={30} limit={12} offset={0} onChange={onChange} />);
 
-    expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Prev/ })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: /Next/ }));
     expect(onChange).toHaveBeenCalledWith(12);
   });

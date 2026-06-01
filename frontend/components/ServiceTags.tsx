@@ -14,13 +14,13 @@ export function ServiceTags({ services, max = 4 }: { services: Service[]; max?: 
       {shown.map((service) => (
         <span
           key={service.slug}
-          className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-700"
+          className="rounded-full border border-line/70 bg-ink-3/50 px-2.5 py-0.5 text-xs text-ash"
         >
           {service.name}
         </span>
       ))}
       {remaining > 0 && (
-        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+        <span className="rounded-full border border-neon/30 px-2.5 py-0.5 text-xs font-medium text-neon-soft">
           +{remaining}
         </span>
       )}

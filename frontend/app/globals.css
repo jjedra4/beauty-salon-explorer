@@ -1,26 +1,252 @@
 @import "tailwindcss";
 
+/*
+ * "Warsaw After-Hours" — a dark, warm editorial atelier theme inspired by
+ * Warsaw's iconic neon signage and high-fashion magazine layouts. Tight
+ * palette: warm ink + porcelain, one electric coral-rose neon accent, gold for
+ * ratings. All motion is CSS-only and respects `prefers-reduced-motion`.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces — warm near-blacks, never pure black. */
+  --ink: #16100e;
+  --ink-2: #1e1714;
+  --ink-3: #281f1b;
+  --line: #3a2e28;
+
+  /* Type */
+  --porcelain: #f6ede1;
+  --ash: #b6a797;
+  --ash-dim: #7e7066;
+
+  /* Accents */
+  --neon: #ff4d6d; /* electric coral-rose */
+  --neon-soft: #ff90a4;
+  --neon-deep: #c8203f;
+  --gold: #f1b24a;
+  --mint: #74e3c2;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Colour tokens → Tailwind utilities (bg-ink, text-porcelain, border-line…) */
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-porcelain: var(--porcelain);
+  --color-ash: var(--ash);
+  --color-ash-dim: var(--ash-dim);
+  --color-neon: var(--neon);
+  --color-neon-soft: var(--neon-soft);
+  --color-neon-deep: var(--neon-deep);
+  --color-gold: var(--gold);
+  --color-mint: var(--mint);
+
+  /* Fonts (wired to next/font variables in layout.tsx) */
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-hanken);
+  --font-mono: var(--font-space-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--line);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--ink);
+  color: var(--porcelain);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+  min-height: 100dvh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Layer 1 — drifting neon glows for atmosphere. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(38vw 38vw at 78% 8%, rgba(255, 77, 109, 0.22), transparent 60%),
+    radial-gradient(42vw 42vw at 12% 88%, rgba(241, 178, 74, 0.12), transparent 62%),
+    radial-gradient(50vw 50vw at 50% 50%, rgba(116, 227, 194, 0.05), transparent 70%);
+  filter: saturate(1.1);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+
+/* Layer 2 — film grain + faint vertical mullions for texture/depth. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  background-size: 116px 100%, 160px 160px;
+}
+
+/* ── Typography ─────────────────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+}
+
+::selection {
+  background: var(--neon);
+  color: var(--ink);
+}
+
+/* ── Smoked-glass surface ───────────────────────────────────────────────── */
+.glass {
+  background: linear-gradient(160deg, rgba(40, 31, 27, 0.72), rgba(22, 16, 14, 0.62));
+  backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(246, 237, 225, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(246, 237, 225, 0.06),
+    0 24px 60px -30px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Neon helpers ───────────────────────────────────────────────────────── */
+.neon-text {
+  color: var(--neon-soft);
+  text-shadow:
+    0 0 8px rgba(255, 77, 109, 0.55),
+    0 0 26px rgba(255, 77, 109, 0.35);
+}
+
+.neon-ring {
+  box-shadow:
+    0 0 0 1px rgba(255, 77, 109, 0.5),
+    0 0 22px -4px rgba(255, 77, 109, 0.55),
+    0 0 60px -20px rgba(255, 77, 109, 0.5);
+}
+
+.hairline {
+  background-image: linear-gradient(90deg, transparent, rgba(255, 77, 109, 0.6), transparent);
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+@keyframes drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(-3%, 2%, 0) scale(1.08);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes neon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow:
+      0 0 8px rgba(255, 77, 109, 0.55),
+      0 0 26px rgba(255, 77, 109, 0.35);
+  }
+  50% {
+    opacity: 0.92;
+    text-shadow:
+      0 0 10px rgba(255, 77, 109, 0.7),
+      0 0 34px rgba(255, 77, 109, 0.5);
+  }
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes sheen {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* The page-load reveal. Children opt in and stagger via inline animation-delay. */
+.rise {
+  opacity: 0;
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.neon-pulse {
+  animation: neon-pulse 4.5s ease-in-out infinite;
+}
+
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--neon);
+  box-shadow: 0 0 8px var(--neon);
+  animation: blink 1.1s step-end infinite;
+}
+
+.shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--ink-2) 30%,
+    var(--ink-3) 50%,
+    var(--ink-2) 70%
+  );
+  background-size: 200% 100%;
+  animation: sheen 1.4s ease-in-out infinite;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ink);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  body::before {
+    animation: none !important;
+  }
+  .rise {
+    opacity: 1;
+  }
 }

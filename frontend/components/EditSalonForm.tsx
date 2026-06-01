@@ -8,8 +8,9 @@ import type { SalonDetail, SalonUpdate } from "@/lib/types";
 
 const PRICE_OPTIONS = ["", "$", "$$", "$$$"];
 const inputClass =
-  "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rose-400 " +
-  "focus:outline-none focus:ring-2 focus:ring-rose-100";
+  "w-full rounded-xl border border-line bg-ink-2/70 px-3.5 py-2.5 text-sm text-porcelain " +
+  "[color-scheme:dark] transition placeholder:text-ash-dim focus:border-neon/60 " +
+  "focus:outline-none focus:ring-2 focus:ring-neon/20";
 
 /** Inline form to edit a salon and persist changes via `PATCH /salons/{id}`. */
 export function EditSalonForm({
@@ -79,10 +80,13 @@ export function EditSalonForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-6">
-      <h2 className="text-lg font-semibold text-gray-900">Edit salon</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="rise glass flex flex-col gap-6 rounded-3xl p-7 sm:p-9"
+    >
+      <h2 className="font-display text-2xl font-light text-porcelain">Edit salon</h2>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Labeled label="Name">
           <input
             className={inputClass}
@@ -93,7 +97,11 @@ export function EditSalonForm({
           />
         </Labeled>
         <Labeled label="District">
-          <select className={inputClass} value={form.district} onChange={(e) => update("district", e.target.value)}>
+          <select
+            className={inputClass}
+            value={form.district}
+            onChange={(e) => update("district", e.target.value)}
+          >
             {(districts ?? [salon.district]).map((d) => (
               <option key={d} value={d}>
                 {d}
@@ -102,7 +110,12 @@ export function EditSalonForm({
           </select>
         </Labeled>
         <Labeled label="Address">
-          <input className={inputClass} required value={form.address} onChange={(e) => update("address", e.target.value)} />
+          <input
+            className={inputClass}
+            required
+            value={form.address}
+            onChange={(e) => update("address", e.target.value)}
+          />
         </Labeled>
         <Labeled label="Phone">
           <input className={inputClass} value={form.phone} onChange={(e) => update("phone", e.target.value)} />
@@ -111,7 +124,11 @@ export function EditSalonForm({
           <input className={inputClass} value={form.website} onChange={(e) => update("website", e.target.value)} />
         </Labeled>
         <Labeled label="Price range">
-          <select className={inputClass} value={form.price_range} onChange={(e) => update("price_range", e.target.value)}>
+          <select
+            className={inputClass}
+            value={form.price_range}
+            onChange={(e) => update("price_range", e.target.value)}
+          >
             {PRICE_OPTIONS.map((p) => (
               <option key={p || "none"} value={p}>
                 {p || "—"}
@@ -133,17 +150,19 @@ export function EditSalonForm({
       </div>
 
       <fieldset>
-        <legend className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Services</legend>
+        <legend className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ash-dim">
+          Services
+        </legend>
         <div className="flex flex-wrap gap-2">
           {(services ?? salon.services).map((service) => {
             const checked = selectedServices.has(service.slug);
             return (
               <label
                 key={service.slug}
-                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition ${
+                className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs transition ${
                   checked
-                    ? "border-rose-300 bg-rose-50 text-rose-700"
-                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                    ? "border-neon/50 bg-neon/10 text-neon-soft"
+                    : "border-line text-ash hover:border-line/60 hover:text-porcelain"
                 }`}
               >
                 <input
@@ -159,20 +178,20 @@ export function EditSalonForm({
         </div>
       </fieldset>
 
-      {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
+      {errorMessage && <p className="text-sm text-neon-soft">{errorMessage}</p>}
 
       <div className="flex gap-3">
         <button
           type="submit"
           disabled={saving}
-          className="rounded-lg bg-rose-600 px-5 py-2 font-medium text-white transition hover:bg-rose-700 disabled:opacity-50"
+          className="rounded-xl bg-neon px-6 py-2.5 font-mono text-xs uppercase tracking-[0.15em] text-ink transition hover:bg-neon-soft hover:shadow-[0_0_24px_-4px_rgba(255,77,109,0.8)] disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save changes"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-gray-300 px-5 py-2 font-medium text-gray-600 transition hover:bg-gray-50"
+          className="rounded-xl border border-line px-6 py-2.5 font-mono text-xs uppercase tracking-[0.15em] text-ash transition hover:text-porcelain"
         >
           Cancel
         </button>
@@ -183,8 +202,8 @@ export function EditSalonForm({
 
 function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</span>
+    <label className="flex flex-col gap-2">
+      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ash-dim">{label}</span>
       {children}
     </label>
   );

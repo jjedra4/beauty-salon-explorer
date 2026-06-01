@@ -10,23 +10,28 @@ const OUT = "../docs/screenshots";
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
-// Listing page
+// Discover / hero — let the entrance animation settle and the ghost prompt type.
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-await page.waitForSelector('a[href^="/salons/"]');
-await page.screenshot({ path: `${OUT}/listing.png`, fullPage: false });
+await page.getByRole("searchbox").waitFor();
+await page.waitForTimeout(1600);
+await page.screenshot({ path: `${OUT}/hero.png`, fullPage: false });
 
-// Detail page
-await page.locator('a[href^="/salons/"]').first().click();
-await page.waitForURL(/\/salons\/\d+/);
-await page.waitForSelector("text=AI review summary");
-await page.screenshot({ path: `${OUT}/detail.png`, fullPage: false });
-
-// Search results
-await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+// Search results — run a query from the hero.
 await page.getByRole("searchbox").fill("hair coloring in Mokotów");
-await page.getByRole("button", { name: "Search" }).click();
+await page.getByRole("button", { name: "Ask" }).click();
+await page.waitForURL(/\/search\?q=/);
 await page.waitForSelector("text=/Semantic|Keyword/");
+await page.waitForTimeout(700);
 await page.screenshot({ path: `${OUT}/search.png`, fullPage: false });
 
+// Detail — open the first salon from the directory.
+await page.goto(`${BASE}/browse`, { waitUntil: "networkidle" });
+await page.waitForSelector('a[href^="/salons/"]');
+await page.locator('a[href^="/salons/"]').first().click();
+await page.waitForURL(/\/salons\/\d+/);
+await page.waitForSelector("text=AI review summary", { timeout: 5000 }).catch(() => {});
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${OUT}/detail.png`, fullPage: false });
+
 await browser.close();
-console.log("Saved listing.png, detail.png, search.png to docs/screenshots/");
+console.log("Saved hero.png, search.png, detail.png to docs/screenshots/");

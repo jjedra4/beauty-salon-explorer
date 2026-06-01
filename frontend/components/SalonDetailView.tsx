@@ -13,15 +13,17 @@ import { ApiError, getSalon } from "@/lib/api";
 /** Salon detail view with an inline edit mode (persists via the API). */
 export function SalonDetailView({ salonId }: { salonId: number }) {
   const [editing, setEditing] = useState(false);
-  const { data: salon, error, isLoading, mutate } = useSWR(
-    Number.isFinite(salonId) ? ["salon", salonId] : null,
-    () => getSalon(salonId),
-  );
+  const {
+    data: salon,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(Number.isFinite(salonId) ? ["salon", salonId] : null, () => getSalon(salonId));
 
   if (isLoading) {
     return (
       <DetailShell>
-        <StateMessage title="Loading salon…" />
+        <div className="shimmer h-96 rounded-3xl" />
       </DetailShell>
     );
   }
@@ -47,7 +49,6 @@ export function SalonDetailView({ salonId }: { salonId: number }) {
         <EditSalonForm
           salon={salon}
           onSaved={(updated) => {
-            // Update the cached salon without a refetch, then exit edit mode.
             void mutate(updated, { revalidate: false });
             setEditing(false);
           }}
@@ -63,63 +64,68 @@ export function SalonDetailView({ salonId }: { salonId: number }) {
 
   return (
     <DetailShell>
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <div className="flex flex-col gap-3 border-b border-gray-100 p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{salon.name}</h1>
-            <div className="flex items-center gap-3">
+      <article className="rise glass overflow-hidden rounded-3xl">
+        <header className="relative flex flex-col gap-4 border-b border-line/50 p-7 sm:p-9">
+          <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-neon/60 to-transparent" />
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.16em] text-ash">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-neon shadow-[0_0_6px_rgba(255,77,109,0.8)]" />
+                {salon.district}
+              </p>
+              <h1 className="mt-3 font-display text-4xl font-light leading-tight text-porcelain sm:text-5xl">
+                {salon.name}
+              </h1>
+            </div>
+            <div className="flex items-center gap-4">
               {salon.price_range && (
-                <span className="text-lg font-semibold text-emerald-600">{salon.price_range}</span>
+                <span className="font-mono text-xl text-gold">{salon.price_range}</span>
               )}
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="rounded-xl border border-line bg-ink-2/60 px-4 py-2 font-mono text-xs uppercase tracking-[0.14em] text-porcelain transition hover:border-neon/50 hover:text-neon-soft"
               >
                 Edit
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1 text-gray-500">
-              <span aria-hidden>📍</span>
-              {salon.district}
-            </span>
+          <div className="flex items-center gap-5">
             <RatingStars rating={salon.rating} reviewCount={salon.review_count} />
           </div>
           <ServiceTags services={salon.services} max={20} />
-        </div>
+        </header>
 
         {salon.review_summary && (
-          <div className="border-b border-gray-100 bg-rose-50/50 p-6">
-            <p className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-rose-700">
-              <span aria-hidden>✨</span> AI review summary
+          <section className="border-b border-line/50 bg-neon/[0.04] p-7 sm:p-9">
+            <p className="mb-3 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-neon-soft">
+              <span aria-hidden>✦</span> AI review summary
             </p>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
+            <p className="whitespace-pre-line font-display text-lg leading-relaxed text-porcelain/90">
               {salon.review_summary}
             </p>
-          </div>
+          </section>
         )}
 
-        <dl className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-6 p-7 sm:grid-cols-2 sm:p-9">
           <Field label="Address">
-            <a className="text-rose-700 hover:underline" href={mapsHref} target="_blank" rel="noreferrer">
+            <a className="text-neon-soft transition hover:text-neon" href={mapsHref} target="_blank" rel="noreferrer">
               {salon.address}
             </a>
           </Field>
           <Field label="Phone">
             {salon.phone ? (
-              <a className="text-rose-700 hover:underline" href={`tel:${salon.phone}`}>
+              <a className="text-neon-soft transition hover:text-neon" href={`tel:${salon.phone}`}>
                 {salon.phone}
               </a>
             ) : (
-              <span className="text-gray-400">—</span>
+              <span className="text-ash-dim">—</span>
             )}
           </Field>
           <Field label="Website">
             {salon.website ? (
               <a
-                className="break-all text-rose-700 hover:underline"
+                className="break-all text-neon-soft transition hover:text-neon"
                 href={salon.website}
                 target="_blank"
                 rel="noreferrer"
@@ -127,20 +133,23 @@ export function SalonDetailView({ salonId }: { salonId: number }) {
                 {salon.website}
               </a>
             ) : (
-              <span className="text-gray-400">—</span>
+              <span className="text-ash-dim">—</span>
             )}
           </Field>
         </dl>
-      </div>
+      </article>
     </DetailShell>
   );
 }
 
 function DetailShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
-      <Link href="/" className="mb-6 inline-block text-sm text-gray-500 hover:text-rose-700">
-        ← Back to all salons
+    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+      <Link
+        href="/browse"
+        className="mb-7 inline-block font-mono text-[11px] uppercase tracking-[0.18em] text-ash transition-colors hover:text-neon-soft"
+      >
+        ← Back to directory
       </Link>
       {children}
     </main>
@@ -150,8 +159,8 @@ function DetailShell({ children }: { children: React.ReactNode }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-700">{children}</dd>
+      <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-ash-dim">{label}</dt>
+      <dd className="mt-2 text-sm text-porcelain">{children}</dd>
     </div>
   );
 }

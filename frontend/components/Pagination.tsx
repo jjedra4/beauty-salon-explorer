@@ -18,15 +18,16 @@ export function Pagination({
   const hasNext = end < total;
 
   const buttonClass =
-    "rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 " +
-    "enabled:hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40";
+    "rounded-xl border border-line bg-ink-2/60 px-4 py-2 font-mono text-xs uppercase " +
+    "tracking-[0.14em] text-porcelain transition enabled:hover:border-neon/50 " +
+    "enabled:hover:text-neon-soft disabled:cursor-not-allowed disabled:opacity-30";
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      <p className="text-sm text-gray-500">
-        Showing <span className="font-medium text-gray-700">{start}</span>–
-        <span className="font-medium text-gray-700">{end}</span> of{" "}
-        <span className="font-medium text-gray-700">{total}</span>
+    <div className="flex items-center justify-between gap-4 pt-2">
+      <p className="font-mono text-xs text-ash-dim">
+        <span className="text-porcelain">{start}</span>–
+        <span className="text-porcelain">{end}</span> of{" "}
+        <span className="text-porcelain">{total}</span>
       </p>
       <div className="flex gap-2">
         <button
@@ -35,7 +36,7 @@ export function Pagination({
           disabled={!hasPrev}
           onClick={() => onChange(Math.max(0, offset - limit))}
         >
-          ← Previous
+          ← Prev
         </button>
         <button
           type="button"

@@ -9,9 +9,9 @@ the task's hard problems actually live — **data quality** (LLM normalization +
 embedding-based deduplication) and **discovery** (natural-language semantic
 search + review summaries) — rather than bolted on.
 
-| Listing & filters | Detail + AI summary | Natural-language search |
+| AI concierge (home) | Search results | Detail + AI summary |
 | --- | --- | --- |
-| ![Listing](docs/screenshots/listing.png) | ![Detail](docs/screenshots/detail.png) | ![Search](docs/screenshots/search.png) |
+| ![Hero](docs/screenshots/hero.png) | ![Search](docs/screenshots/search.png) | ![Detail](docs/screenshots/detail.png) |
 
 ---
 
@@ -32,16 +32,23 @@ docker compose up --build   # or: make up
 | API (Swagger)  | http://localhost:8000/docs     |
 | Health check   | http://localhost:8000/health   |
 
-That's it — open http://localhost:3000 and browse 60 Warsaw salons.
+That's it — open http://localhost:3000. The home page is an **AI concierge**:
+describe what you want in plain language and it routes you to ranked results.
 
-## Features
+## The UI
 
-- **Browse & filter** salons by district and service type, with pagination.
-- **Natural-language search** — e.g. *"cheap barber in Mokotów with great
-  reviews"* — backed by AI (with a keyword fallback when no key is set).
-- **Detail view** with contact info, services, a map link, and an **AI-generated
-  review summary** (pros/cons + vibe).
-- **Edit** any salon inline; changes persist via the API.
+A search-first, editorial dark theme ("Warsaw After-Hours" — Fraunces /
+Hanken Grotesk / Space Mono, a single neon accent, CSS-only motion):
+
+- **`/` — Discover:** an oversized concierge prompt bar with example queries that
+  type themselves out; submitting routes to the results page.
+- **`/search` — Results:** large result tiles (rank, rating, services, and a
+  relevance meter for semantic results) plus a badge showing which retrieval
+  path ran (AI **Semantic** vs. **Keyword** fallback).
+- **`/browse` — Directory:** the full catalogue with district/service filters
+  and pagination.
+- **`/salons/[id]` — Detail:** contact info, services, a map link, and the
+  **AI-generated review summary**; edit any field inline (persists via the API).
 
 ## The AI approach (the differentiator)
 

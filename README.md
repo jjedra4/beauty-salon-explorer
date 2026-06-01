@@ -1,4 +1,4 @@
-# 💇 Warsaw Beauty Salon Explorer
+# Warsaw Beauty Salon Explorer
 
 A full-stack application that collects hair & beauty salons across Warsaw,
 serves them through a REST API, and presents them in a web UI where you can
@@ -17,12 +17,13 @@ search + review summaries) — rather than bolted on.
 
 ## Quick start
 
-The app ships with a committed, AI-ready **seed dataset**, so it runs
-end-to-end with **no API keys** — one command, and the database is migrated and
-seeded automatically.
+The repository ships with a committed dataset of **2,000+ real Warsaw salons** —
+collected from Google Places, AI-enriched (normalized services, deduplicated,
+review summaries), **with search embeddings included** — so the app runs
+end-to-end with **no API keys**.
 
 ```bash
-cp .env.example .env        # defaults work out of the box
+cp .env.example .env        # works out of the box — no keys required
 docker compose up --build   # or: make up
 ```
 
@@ -32,28 +33,26 @@ docker compose up --build   # or: make up
 | API (Swagger)  | http://localhost:8000/docs     |
 | Health check   | http://localhost:8000/health   |
 
-That's it — open http://localhost:3000. The home page is an **AI concierge**:
-describe what you want in plain language and it routes you to ranked results.
+On first start the database is migrated and seeded automatically. Open
+http://localhost:3000 — the home page is an **AI concierge**: describe what you
+want in plain language and it takes you to ranked results.
 
-## The UI
+> Browsing, filtering, salon details (with the AI review summaries), editing,
+> and keyword search all work with **no keys**. Live **semantic** NL search
+> needs an `OPENAI_API_KEY` — see [Data & keys](#data--keys).
 
-A search-first, editorial dark theme ("Warsaw After-Hours" — Fraunces /
-Hanken Grotesk / Space Mono, a single neon accent, CSS-only motion):
+## Screens
 
-- **`/` — Discover:** an oversized concierge prompt bar with example queries that
-  type themselves out; submitting routes to the results page.
-- **`/search` — Results:** large result tiles (rank, rating, services, and a
-  relevance meter for semantic results) plus a badge showing which retrieval
-  path ran (AI **Semantic** vs. **Keyword** fallback).
-- **`/browse` — Directory:** the full catalogue with district/service filters
-  and pagination.
-- **`/salons/[id]` — Detail:** contact info, services, a map link, and the
-  **AI-generated review summary**; edit any field inline (persists via the API).
+| Screen | Route | What you can see & do |
+| --- | --- | --- |
+| **Discover** (home) | `/` | A large natural-language search bar with rotating example prompts. Type a request in Polish or English (e.g. *"barber for a skin fade in Praga, open late"*) and submit to get ranked results. A small "trending" strip links into the directory. |
+| **Search results** | `/search?q=…` | Ranked result tiles showing name, district, rating & review count, price, and services. A badge marks whether results came from AI **semantic** search or the **keyword** fallback; semantic results also show a relevance meter. Refine the query from the bar at the top. |
+| **Directory** (browse) | `/browse` | The full catalogue of 2,000+ salons in a masonry grid, with **district** and **service** filters and pagination. Each card links to its detail page. |
+| **Salon detail** | `/salons/[id]` | Full details — address (with a map link), phone, website, services, rating & review count — plus the **AI review summary** shown as a one-line vibe and colour-coded pros & cons. An **Edit** button opens an inline form to change any field; saves persist via the API. |
 
-## The AI approach (the differentiator)
+## The AI approach
 
-AI is placed on the task's two hard problems, which map onto SumUp's grading
-criteria:
+AI is placed on the task's two hard problems:
 
 1. **Data quality → an AI ingestion pipeline** (`backend/pipeline/`):
    - **LLM normalization**: messy, multilingual service text → a fixed,
@@ -82,23 +81,24 @@ LLM (structured extraction, query understanding, summarization).
 | Data      | Google Places API (New)                                                |
 | Tooling   | Docker Compose · uv · ruff · mypy · pytest · ESLint · Vitest · Playwright |
 
-## Enabling real data & live AI
+## Data & keys
 
-The committed seed is realistic **synthetic** data so the app runs offline.
-To use real salons and live semantic search, add keys to `.env`:
+The committed seed (`backend/data/seed/salons.json`) is **real data**: 2,000+
+Warsaw salons collected from the Google Places API (New), run through the AI
+enrichment pipeline, with a `text-embedding-3-small` vector stored alongside
+each record. Because the embeddings ship in the seed, **no keys are needed to
+run** — and there is no synthetic placeholder data.
 
-```bash
-OPENAI_API_KEY=...          # enables LLM enrichment + semantic search
-GOOGLE_MAPS_API_KEY=...        # enables live collection from Google Places
-```
+| You want to… | Add to `.env` | Notes |
+| --- | --- | --- |
+| Browse / filter / view details / edit / keyword search | *(nothing)* | Works out of the box on the committed data. |
+| Run **live semantic NL search** | `OPENAI_API_KEY` | Used only to embed the *query* at request time — salon embeddings are already committed, so no Google key or re-collection is needed. Without it, search falls back to keyword matching. |
+| **Refresh or expand** the dataset | `OPENAI_API_KEY` + `GOOGLE_MAPS_API_KEY` | Re-collect from Google Places and re-enrich. |
 
 ```bash
 make pipeline   # collect from Google Places + AI-enrich -> writes the seed
-make seed       # load the seed into the DB (generates embeddings if a key is set)
+make seed       # load the seed into the database (idempotent upsert)
 ```
-
-With only an `OPENAI_API_KEY`, `make seed` generates embeddings for the existing
-seed, so **semantic search works on the demo data without a Google key**.
 
 ## API overview
 
@@ -126,9 +126,10 @@ make frontend-dev  # next dev server
 
 - **Backend tests** run against a dedicated `salon_test` database (created
   automatically) and never touch the app's data. OpenAI is faked in tests.
-- **88%** backend line coverage; CI gates at 80%.
-- **Tests**: 58 backend (unit + integration on real Postgres/pgvector),
-  8 frontend component tests, 3 Playwright e2e specs.
+- **~88%** backend line coverage; CI gates at 80%.
+- **Tests**: 60 backend (unit + integration on real Postgres/pgvector; plus 5
+  live API smoke tests excluded by default), 12 frontend unit tests, and 3
+  Playwright e2e specs.
 
 ## Project structure
 
@@ -173,15 +174,6 @@ and decision notes.
 
 ## What I'd improve with more time
 
-- A conversational, tool-using salon-finder **agent** on top of the search API.
-- **Multi-source** collection (e.g. Booksy + OSM) to exercise cross-source dedup
-  on real overlapping records.
-- LLM-response **caching** and batch embedding to cut pipeline cost/time.
-- Hybrid search (blend vector + keyword scores) and a smarter keyword fallback.
-- A map view with clustering; user accounts & auth; richer review handling.
-- Generate the frontend's API types directly from the live OpenAPI schema in CI.
-
----
-
-Built milestone by milestone — see [`docs/milestones/`](docs/milestones/) for the
-full build log (M0–M8).
+- **Richer data enrichment from more sources.** Add a **Booksy** collector (a new Strategy class) for explicit service menus, and feed reviews into classification — both fix the thin, name-derived service tags.
+- **Expand the territory — starting with Kraków.** Lift the Warsaw-specific districts/grid into a per-city config and add a `city` dimension; the schema and API are already city-agnostic.
+- **A stronger search engine with a real relevance score.** Make the extracted filters *soft* (boost, don't exclude) and blend vector similarity with rating and a review-count confidence weight — i.e. proper hybrid ranking, surfaced in the relevance meter.

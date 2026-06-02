@@ -55,20 +55,24 @@ want in plain language and it takes you to ranked results.
 AI is placed on the task's two hard problems:
 
 1. **Data quality → an AI ingestion pipeline** (`backend/pipeline/`):
-   - **LLM normalization**: messy, multilingual service text → a fixed,
-     canonical taxonomy (the genuinely hard NLP task). District and price are
-     resolved deterministically — AI is used only where it adds value.
+   - **Review-driven extraction**: Google gives salons only a coarse category and
+     (almost always) no price, so a single LLM call reads each salon's **customer
+     reviews** + categories and returns its actual **services** (mapped to a fixed
+     taxonomy) plus a **price tier** inferred from review price language
+     (*"przystępne ceny"* → `$`, *"zapłaciłam 400 zł"* → `$$$`). A deterministic
+     primary-category floor guarantees the obvious core service is never missed.
    - **Embedding-based deduplication**: salons surfaced by overlapping searches
-     are clustered by cosine similarity (guarded by name similarity) and merged
-     into canonical records.
-   - **Review summarization**: reviews → a short pros/cons + vibe blurb.
-2. **Discovery → semantic search** (`backend/app/services/search_service.py`):
-   the LLM extracts structured filters from the query, the query is embedded,
-   and salons are ranked by `pgvector` cosine distance with the filters applied
-   as hard constraints. Falls back to trigram keyword search with no key.
+     are clustered by cosine similarity (guarded by name similarity) and merged.
+   - **Review summarization**: reviews → a short vibe + pros/cons blurb.
+2. **Discovery → hybrid semantic search** (`backend/app/services/search_service.py`):
+   the LLM extracts structured filters; the query is embedded; a `pgvector`
+   candidate pool is **re-ranked by a blended relevance score** — vector
+   similarity + a review-count-weighted rating + soft filter matches. Filters
+   *boost* rather than exclude (so a strict query never returns nothing); only an
+   explicit district is hard. Falls back to trigram keyword search with no key.
 
-This spans classical ML (embeddings, similarity, vector retrieval) + applied
-LLM (structured extraction, query understanding, summarization).
+This spans classical ML (embeddings, similarity, vector retrieval, ranking) +
+applied LLM (review extraction, query understanding, summarization).
 
 ## Tech stack
 
@@ -174,6 +178,6 @@ and decision notes.
 
 ## What I'd improve with more time
 
-- **Richer data enrichment from more sources.** Add a **Booksy** collector (a new Strategy class) for explicit service menus, and feed reviews into classification — both fix the thin, name-derived service tags.
+- **More data sources (Booksy).** Reviews already drive service + price extraction; a **Booksy** collector (a new Strategy class) would add explicit service menus, prices and durations, and exercise real cross-source deduplication.
 - **Expand the territory — starting with Kraków.** Lift the Warsaw-specific districts/grid into a per-city config and add a `city` dimension; the schema and API are already city-agnostic.
-- **A stronger search engine with a real relevance score.** Make the extracted filters *soft* (boost, don't exclude) and blend vector similarity with rating and a review-count confidence weight — i.e. proper hybrid ranking, surfaced in the relevance meter.
+- **Learned ranking + an "open now" filter.** The hybrid relevance score uses fixed weights; click-through data could tune them. The pipeline now also captures opening hours, which an "open late / open now" filter could use.

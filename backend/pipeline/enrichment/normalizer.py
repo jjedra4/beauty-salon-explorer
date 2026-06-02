@@ -2,11 +2,18 @@
 
 Turns messy, multilingual source fields into the canonical domain:
 
-* **District** and **price range** are resolved deterministically (cheap,
-  reliable signals — address text and Google's price enum).
-* **Services** are classified by the LLM, which is where the genuine NLP value
-  is: mapping free-text like *"koloryzacja, baleyage, strzyżenie"* onto the
-  fixed taxonomy. The model's output is always validated against known slugs.
+* **District** is resolved deterministically from the address text (a cheap,
+  reliable signal).
+* **Services and price tier** are extracted by a single LLM call over the
+  salon's name, Google categories, and — crucially — its **customer reviews**.
+  Reviews are the richest signal: they name concrete services ("koloryzacja",
+  "trwała", "fade") and price cues ("400 zł", "przystępne ceny") that the coarse
+  Google ``types`` and (usually empty) ``editorialSummary`` never capture.
+
+The model's service output is validated against the closed taxonomy, deduped,
+and unioned with a deterministic floor for the salon's primary category so the
+obvious core service is never missed. Price falls back from any Google price
+level to the review-derived tier. ``other`` is only kept when nothing else fits.
 """
 
 from pydantic import BaseModel
@@ -20,6 +27,8 @@ from pipeline.collectors.base import RawSalon
 logger = get_logger(__name__)
 
 _DEFAULT_DISTRICT = "Śródmieście"
+_MAX_REVIEWS = 6
+_REVIEW_CHARS = 2400
 
 # Google Places (New) price level enum -> canonical price band.
 _PRICE_LEVEL_MAP: dict[str, PriceRange] = {
@@ -29,10 +38,48 @@ _PRICE_LEVEL_MAP: dict[str, PriceRange] = {
     "PRICE_LEVEL_VERY_EXPENSIVE": PriceRange.PREMIUM,
 }
 
-_SERVICE_SYSTEM_PROMPT = (
-    "You classify Polish/English beauty-salon descriptions into a fixed service "
-    "taxonomy. Return only slugs from the provided list that the salon clearly "
-    "offers. Do not invent slugs. If nothing matches, return ['other']."
+# Review-derived price tier (LLM) -> canonical price band. "unknown" -> None.
+_PRICE_TIER_MAP: dict[str, PriceRange] = {
+    "budget": PriceRange.BUDGET,
+    "moderate": PriceRange.MODERATE,
+    "premium": PriceRange.PREMIUM,
+}
+
+# Deterministic floor: a salon's primary Google category implies a core service
+# that should always be present, even when reviews are sparse. Kept conservative
+# (only unambiguous categories) so it never injects a wrong service.
+_TYPE_FLOOR: dict[str, list[str]] = {
+    "barber_shop": ["barber"],
+    "hair_salon": ["womens-haircut"],
+    "nail_salon": ["manicure"],
+    "spa": ["massage"],
+    "massage_spa": ["massage"],
+    "skin_care_clinic": ["facial"],
+}
+
+_ENRICHMENT_SYSTEM_PROMPT = (
+    "You are a data analyst for a Warsaw beauty-salon directory. From the salon's "
+    "name, Google categories and CUSTOMER REVIEWS, output the services it actually "
+    "offers (taxonomy slugs) and a price tier.\n"
+    "SERVICES — include a slug only with clear evidence: a review mentioning it, or "
+    "a Google category that directly implies it (hair_salon->haircuts, nail_salon->"
+    "manicure, barber_shop->barber, spa/massage->massage). Map Polish terms: "
+    "koloryzacja->hair-coloring; baleyage/sombre/refleksy/pasemka->balayage-highlights; "
+    "strzyżenie damskie->womens-haircut; strzyżenie męskie/fryzjer męski/fade->"
+    "mens-haircut; broda/zarost->beard-trim; trwała/modelowanie/prostowanie/upięcie->"
+    "hair-styling; keratyna/botoks/regeneracja/nawilżanie włosów->hair-treatment; "
+    "hybryda/żel/paznokcie->gel-nails; manicure->manicure; pedicure->pedicure; "
+    "zdobienia->nail-art; rzęsy/przedłużanie rzęs->lash-extensions; lifting/laminacja "
+    "rzęs->lash-lift; brwi/henna brwi/regulacja brwi->brow-shaping; makijaż->makeup; "
+    "masaż->massage; oczyszczanie/zabieg na twarz/peeling/mezoterapia->facial; "
+    "depilacja/woskowanie/wosk->waxing. Do NOT assume a full menu from one mention "
+    "(a barber doing fades is NOT a colorist; a nail salon is NOT a hairdresser). "
+    "Prefer specific slugs; use 'other' ONLY when nothing fits, never alongside "
+    "specific slugs.\n"
+    "PRICE TIER from review language ONLY: 'budget' (tanio/niedrogo/przystępne ceny "
+    "or low prices), 'premium' (drogo/wygórowane/ekskluzywny or high prices), "
+    "'moderate' (explicit reasonable/fair/mid or mixed price mentions), 'unknown' "
+    "(no price or value language — do NOT guess from quality or ambience)."
 )
 
 
@@ -44,10 +91,13 @@ class NormalizedFields(BaseModel):
     service_slugs: list[str]
 
 
-class _ServiceClassification(BaseModel):
-    """Structured LLM output: chosen service slugs (validated downstream)."""
+class _SalonEnrichment(BaseModel):
+    """Structured LLM output: services + a coarse price tier (validated downstream)."""
 
     service_slugs: list[str]
+    # budget | moderate | premium | unknown. Defaulted so partial fakes/old
+    # outputs stay valid; the real model always sets it.
+    price_tier: str = "unknown"
 
 
 def resolve_district(raw: RawSalon) -> str:
@@ -74,32 +124,55 @@ def normalize_price_range(price_level: str | None) -> str | None:
     return band.value if band else None
 
 
+def _type_floor(raw: RawSalon) -> list[str]:
+    """Core service(s) implied by the salon's primary Google category."""
+    primary = raw.primary_type or (raw.types[0] if raw.types else None)
+    return _TYPE_FLOOR.get(primary or "", [])
+
+
 class SalonNormalizer:
-    """Normalizes raw salons; uses an LLM only for service classification."""
+    """Normalizes raw salons; uses one LLM call for services + price tier."""
 
     def __init__(self, llm: LLMClient) -> None:
         self._llm = llm
 
     def normalize(self, raw: RawSalon) -> NormalizedFields:
         """Return normalized district, price band, and service slugs."""
+        enrichment = self._enrich(raw)
+        # Trust Google's own price level when present (rare for salons); otherwise
+        # use the review-derived tier.
+        price_range = normalize_price_range(raw.price_level)
+        if price_range is None:
+            tier = _PRICE_TIER_MAP.get(enrichment.price_tier.strip().lower())
+            price_range = tier.value if tier else None
         return NormalizedFields(
             district=resolve_district(raw),
-            price_range=normalize_price_range(raw.price_level),
-            service_slugs=self._classify_services(raw),
+            price_range=price_range,
+            service_slugs=self._resolve_services(raw, enrichment.service_slugs),
         )
 
-    def _classify_services(self, raw: RawSalon) -> list[str]:
-        """Classify a salon's services into canonical slugs via the LLM."""
-        description = " | ".join(
-            part for part in [raw.name, raw.raw_services_text, " ".join(raw.types)] if part
-        )
+    def _enrich(self, raw: RawSalon) -> _SalonEnrichment:
+        """Single structured LLM call extracting services + price tier from reviews."""
         allowed = ", ".join(f"{s.slug} ({s.name})" for s in SERVICE_TAXONOMY)
-        result = self._llm.parse(
-            system=_SERVICE_SYSTEM_PROMPT,
-            user=f"Allowed slugs: {allowed}\n\nSalon: {description}",
-            schema=_ServiceClassification,
+        reviews = "\n".join(f"- {r}" for r in raw.reviews[:_MAX_REVIEWS])[:_REVIEW_CHARS]
+        user = (
+            f"Taxonomy slugs: {allowed}\n\n"
+            f"Name: {raw.name}\n"
+            f"Google categories: {', '.join(raw.types) or 'n/a'}\n"
+            f"Primary category: {raw.primary_type_display or 'n/a'}\n"
+            f"Reviews:\n{reviews or '(none)'}"
         )
-        # Validate against the taxonomy; drop anything hallucinated.
-        valid = [slug for slug in result.service_slugs if slug in VALID_SERVICE_SLUGS]
-        deduped = list(dict.fromkeys(valid))  # preserve order, remove repeats
-        return deduped or ["other"]
+        try:
+            return self._llm.parse(
+                system=_ENRICHMENT_SYSTEM_PROMPT, user=user, schema=_SalonEnrichment
+            )
+        except Exception:  # noqa: BLE001 - never let one salon abort the pipeline
+            logger.exception("Enrichment failed for %s; using type floor only", raw.name)
+            return _SalonEnrichment(service_slugs=[], price_tier="unknown")
+
+    def _resolve_services(self, raw: RawSalon, llm_slugs: list[str]) -> list[str]:
+        """Validate, union with the type floor, dedupe, and clean up the slug list."""
+        valid = [slug for slug in llm_slugs if slug in VALID_SERVICE_SLUGS]
+        merged = list(dict.fromkeys([*_type_floor(raw), *valid]))  # floor first, ordered
+        specific = [slug for slug in merged if slug != "other"]
+        return specific or ["other"]

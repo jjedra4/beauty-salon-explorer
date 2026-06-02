@@ -29,7 +29,10 @@ class OpenAIClient:
         embedding_model: str,
         client: OpenAI | None = None,
     ) -> None:
-        self._client = client or OpenAI(api_key=api_key)
+        # Bulk enrichment can saturate the per-minute token limit; let the SDK
+        # ride out 429s with its exponential backoff (it honours Retry-After)
+        # instead of surfacing the error to the pipeline.
+        self._client = client or OpenAI(api_key=api_key, max_retries=8)
         self._chat_model = chat_model
         self._embedding_model = embedding_model
 

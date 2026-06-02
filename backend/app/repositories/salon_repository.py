@@ -7,7 +7,7 @@ Vector/keyword search methods are added in M5.
 """
 
 from sqlalchemy import Select, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.salon import Salon
 from app.models.service import Service
@@ -65,18 +65,30 @@ class SalonRepository:
         return list(self._db.scalars(stmt))
 
     # ── Search ─────────────────────────────────────────────────────────────
-    def vector_search(
-        self, embedding: list[float], filters: SearchFilters, limit: int
+    def vector_candidates(
+        self,
+        embedding: list[float],
+        *,
+        district: str | None = None,
+        pool_size: int = 80,
     ) -> list[tuple[Salon, float]]:
-        """Rank salons by embedding cosine distance, applying hard filters.
+        """Fetch the nearest-by-cosine candidate pool for re-ranking.
 
-        Only salons that have an embedding are considered. Returns
-        ``(salon, distance)`` pairs ordered nearest-first.
+        Only ``district`` is applied as a hard filter (an intentional location
+        constraint); softer signals (price, rating, services) are left to the
+        service layer to *boost* rather than exclude, so a strict query never
+        collapses the result set to nothing. Services are eager-loaded to avoid
+        an N+1 during scoring. Returns ``(salon, distance)`` nearest-first.
         """
         distance = Salon.embedding.cosine_distance(embedding).label("distance")
-        stmt = select(Salon, distance).where(Salon.embedding.is_not(None))
-        stmt = self._apply_search_filters(stmt, filters)
-        stmt = stmt.order_by(distance).limit(limit)
+        stmt = (
+            select(Salon, distance)
+            .where(Salon.embedding.is_not(None))
+            .options(selectinload(Salon.services))
+        )
+        if district:
+            stmt = stmt.where(Salon.district == district)
+        stmt = stmt.order_by(distance).limit(pool_size)
         return [(row[0], float(row[1])) for row in self._db.execute(stmt).unique().all()]
 
     def keyword_search(

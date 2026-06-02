@@ -12,6 +12,7 @@ The clients are injected, so the service is fully testable; ``from_settings``
 wires the real OpenAI-backed clients for production use.
 """
 
+import math
 from dataclasses import dataclass
 from typing import Literal
 
@@ -26,6 +27,17 @@ from app.repositories.salon_repository import SalonRepository
 from app.schemas.search import SearchFilters
 
 logger = get_logger(__name__)
+
+# Blended relevance weights (sum to 1). Vector similarity leads; a salon's
+# review-weighted quality and how well it matches the extracted filters refine
+# the order without ever excluding a candidate.
+_W_SIMILARITY = 0.62
+_W_QUALITY = 0.20
+_W_FILTERS = 0.18
+# Rating assumed for unrated salons (slightly below the ~4.6 city average).
+_DEFAULT_RATING = 3.6
+# Review count at which we fully trust a rating (log10(1000) = 3).
+_CONFIDENCE_SATURATION = 3.0
 
 
 @dataclass
@@ -71,10 +83,54 @@ class SearchService:
         return SearchOutcome(mode="keyword", results=results)
 
     def _semantic_search(self, query: str, limit: int) -> SearchOutcome:
-        """Run LLM filter extraction + vector ranking."""
+        """Run LLM filter extraction + vector retrieval + blended re-ranking."""
         assert self._llm is not None and self._embedder is not None
         filters = QueryParser(self._llm).parse(query)
         vector = self._embedder.embed([query])[0]
-        results = self._repo.vector_search(vector, filters, limit)
-        logger.info("Semantic search '%s' -> %d results", query, len(results))
-        return SearchOutcome(mode="semantic", results=results)
+        # Pull a generous candidate pool, then re-rank — so soft signals reorder
+        # results instead of filtering them away.
+        pool = self._repo.vector_candidates(
+            vector, district=filters.district, pool_size=max(limit * 4, 60)
+        )
+        ranked = self._rank(pool, filters)[:limit]
+        logger.info("Semantic search '%s' -> %d results", query, len(ranked))
+        return SearchOutcome(mode="semantic", results=ranked)
+
+    def _rank(
+        self, pool: list[tuple[Salon, float]], filters: SearchFilters
+    ) -> list[tuple[Salon, float]]:
+        """Re-rank a candidate pool by a blended 0..1 relevance score."""
+        scored = [(salon, self._score(salon, distance, filters)) for salon, distance in pool]
+        scored.sort(key=lambda pair: pair[1], reverse=True)
+        return scored
+
+    def _score(self, salon: Salon, distance: float, filters: SearchFilters) -> float:
+        """Blend vector similarity, review-weighted quality, and filter match."""
+        similarity = max(0.0, 1.0 - distance)
+        rating = salon.rating if salon.rating is not None else _DEFAULT_RATING
+        confidence = min(1.0, math.log10((salon.review_count or 0) + 1) / _CONFIDENCE_SATURATION)
+        # A high rating counts more when many reviews back it up.
+        quality = (rating / 5.0) * (0.5 + 0.5 * confidence)
+        return (
+            _W_SIMILARITY * similarity
+            + _W_QUALITY * quality
+            + _W_FILTERS * self._filter_match(salon, filters)
+        )
+
+    @staticmethod
+    def _filter_match(salon: Salon, filters: SearchFilters) -> float:
+        """Fraction of the extracted soft filters this salon satisfies (0..1).
+
+        Returns a neutral 0.5 when the query carried no soft filters, so the
+        term neither helps nor hurts.
+        """
+        signals: list[float] = []
+        if filters.service_slugs:
+            wanted = set(filters.service_slugs)
+            offered = {service.slug for service in salon.services}
+            signals.append(1.0 if wanted & offered else 0.0)
+        if filters.price_range:
+            signals.append(1.0 if salon.price_range == filters.price_range else 0.0)
+        if filters.min_rating is not None:
+            signals.append(1.0 if (salon.rating or 0.0) >= filters.min_rating else 0.0)
+        return sum(signals) / len(signals) if signals else 0.5

@@ -17,8 +17,9 @@ _SYSTEM_PROMPT = (
     "You extract structured search filters from a user's query for a Warsaw "
     "beauty-salon directory. Queries may be in Polish or English. Only set a "
     "field when the query clearly implies it; otherwise leave it null/empty. "
-    "Map service mentions to the provided slugs. Interpret 'cheap/tani' as '$', "
-    "'premium/drogi' as '$$$'. Interpret 'good/great reviews' as min_rating 4.5."
+    "Map service mentions to the provided slugs. Interpret 'cheap/tani/niedrogi' as "
+    "'$', 'mid-range/średnia półka/umiarkowane ceny' as '$$', 'premium/drogi/"
+    "ekskluzywny' as '$$$'. Interpret 'good/great reviews' as min_rating 4.5."
 )
 
 

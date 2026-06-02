@@ -15,14 +15,13 @@ from app.services.search_service import SearchService
 router = APIRouter(tags=["search"])
 
 
-def _to_score(mode: str, raw: float) -> float:
-    """Convert a raw repository value to a 0..1 relevance score.
+def _to_score(raw: float) -> float:
+    """Clamp/round a relevance score for display.
 
-    Semantic search returns cosine *distance* (smaller = closer), so similarity
-    is ``1 - distance``; keyword search already returns a 0..1 similarity.
+    Both paths already produce a 0..1 score where higher is better — semantic
+    is the service's blended relevance, keyword is trigram similarity.
     """
-    score = (1.0 - raw) if mode == "semantic" else raw
-    return round(max(0.0, min(1.0, score)), 4)
+    return round(max(0.0, min(1.0, raw)), 4)
 
 
 @router.get("/salons/search", response_model=SearchResponse, summary="Natural-language search")
@@ -40,7 +39,7 @@ def search_salons(
     items = [
         SalonSearchResult(
             **SalonSummary.model_validate(salon).model_dump(),
-            score=_to_score(outcome.mode, raw_score),
+            score=_to_score(raw_score),
         )
         for salon, raw_score in outcome.results
     ]

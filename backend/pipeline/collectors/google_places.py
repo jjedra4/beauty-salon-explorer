@@ -45,6 +45,10 @@ _FIELD_MASK = ",".join(
         "places.userRatingCount",
         "places.priceLevel",
         "places.types",
+        "places.primaryType",
+        "places.primaryTypeDisplayName",
+        "places.businessStatus",
+        "places.regularOpeningHours",
         "places.nationalPhoneNumber",
         "places.websiteUri",
         "places.reviews",
@@ -95,8 +99,9 @@ class GooglePlacesCollector(SalonCollector):
         return "google_places"
 
     def collect(self) -> Iterator[RawSalon]:
-        """Yield unique salons across all district × query searches."""
+        """Yield unique, operational salons across all district × query searches."""
         seen: set[str] = set()
+        skipped_closed = 0
         for district in self._districts:
             for query in self._queries:
                 for place in self._search_all_pages(query, district):
@@ -104,8 +109,16 @@ class GooglePlacesCollector(SalonCollector):
                     if not place_id or place_id in seen:
                         continue
                     seen.add(place_id)
+                    # Drop permanently-closed places — stale listings hurt data quality.
+                    if place.get("businessStatus") == "CLOSED_PERMANENTLY":
+                        skipped_closed += 1
+                        continue
                     yield self._to_raw_salon(place, district.name)
-        logger.info("Collected %d unique places from Google Places", len(seen))
+        logger.info(
+            "Collected %d unique places from Google Places (skipped %d closed)",
+            len(seen) - skipped_closed,
+            skipped_closed,
+        )
 
     # ── HTTP ───────────────────────────────────────────────────────────────
     def _search_all_pages(self, query: str, district: DistrictCentroid) -> Iterator[dict[str, Any]]:
@@ -173,7 +186,9 @@ class GooglePlacesCollector(SalonCollector):
         ]
         editorial = place.get("editorialSummary", {}).get("text")
         types = place.get("types", [])
-        raw_services_text = editorial or " ".join(types) or None
+        primary_type_display = place.get("primaryTypeDisplayName", {}).get("text")
+        # Prefer the editorial blurb, then the human category label, then raw types.
+        raw_services_text = editorial or primary_type_display or " ".join(types) or None
         location = place.get("location", {})
 
         return RawSalon(
@@ -189,6 +204,10 @@ class GooglePlacesCollector(SalonCollector):
             review_count=place.get("userRatingCount"),
             price_level=place.get("priceLevel"),
             types=types,
+            primary_type=place.get("primaryType"),
+            primary_type_display=primary_type_display,
+            business_status=place.get("businessStatus"),
+            opening_hours=place.get("regularOpeningHours", {}).get("weekdayDescriptions", []),
             reviews=reviews,
             raw_services_text=raw_services_text,
             district_hint=district_hint,

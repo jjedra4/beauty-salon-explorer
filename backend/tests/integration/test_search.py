@@ -77,6 +77,43 @@ class TestSemanticSearch:
 
         assert [s.name for s, _ in outcome.results] == ["Mokotow Salon"]
 
+    def test_review_weighted_quality_breaks_vector_ties(self, api_client) -> None:
+        _client, factory = api_client
+        with factory() as session:
+            # Identical embeddings -> identical similarity; quality decides order.
+            load_seed(
+                session,
+                [
+                    _salon("x", "Popular", embedding=_onehot(0), rating=4.9, review_count=500),
+                    _salon("y", "Obscure", embedding=_onehot(0), rating=4.0, review_count=3),
+                ],
+            )
+        with factory() as session:
+            service = SearchService(
+                session,
+                llm=FakeLLM(parse_fields={"service_slugs": []}),
+                embedder=ConstantEmbedder(_onehot(0)),
+            )
+            outcome = service.search("anything")
+
+        assert [s.name for s, _ in outcome.results] == ["Popular", "Obscure"]
+
+    def test_soft_price_filter_boosts_but_does_not_exclude(self, api_client) -> None:
+        _client, factory = api_client
+        with factory() as session:
+            load_seed(session, [_salon("a", "Pricey", embedding=_onehot(0), price_range="$$$")])
+        with factory() as session:
+            # Query implies cheap ($) but the only salon is $$$ — still returned.
+            service = SearchService(
+                session,
+                llm=FakeLLM(parse_fields={"service_slugs": [], "price_range": "$"}),
+                embedder=ConstantEmbedder(_onehot(0)),
+            )
+            outcome = service.search("tani salon")
+
+        assert outcome.mode == "semantic"
+        assert [s.name for s, _ in outcome.results] == ["Pricey"]
+
 
 class TestKeywordFallback:
     def test_keyword_search_without_ai(self, api_client) -> None:

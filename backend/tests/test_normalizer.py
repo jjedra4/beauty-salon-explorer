@@ -50,3 +50,40 @@ class TestServiceClassification:
         llm = FakeLLM(service_slugs=["nonsense"])
         result = SalonNormalizer(llm).normalize(_raw())
         assert result.service_slugs == ["other"]
+
+    def test_strips_other_when_a_specific_slug_is_present(self) -> None:
+        llm = FakeLLM(service_slugs=["manicure", "other"])
+        result = SalonNormalizer(llm).normalize(_raw())
+        assert result.service_slugs == ["manicure"]
+
+
+class TestTypeFloor:
+    def test_primary_category_floor_is_always_present(self) -> None:
+        # The model returns nothing, but a barber_shop must still offer 'barber'.
+        llm = FakeLLM(parse_fields={"service_slugs": [], "price_tier": "unknown"})
+        result = SalonNormalizer(llm).normalize(_raw(primary_type="barber_shop"))
+        assert "barber" in result.service_slugs
+
+    def test_floor_merges_with_model_services_without_duplicates(self) -> None:
+        llm = FakeLLM(
+            parse_fields={"service_slugs": ["barber", "beard-trim"], "price_tier": "unknown"}
+        )
+        result = SalonNormalizer(llm).normalize(_raw(types=["barber_shop"]))
+        assert result.service_slugs == ["barber", "beard-trim"]
+
+
+class TestPriceInference:
+    def test_uses_review_derived_tier_when_google_price_absent(self) -> None:
+        llm = FakeLLM(parse_fields={"service_slugs": ["manicure"], "price_tier": "budget"})
+        result = SalonNormalizer(llm).normalize(_raw(types=["nail_salon"]))
+        assert result.price_range == "$"
+
+    def test_prefers_google_price_level_over_review_tier(self) -> None:
+        llm = FakeLLM(parse_fields={"service_slugs": ["manicure"], "price_tier": "budget"})
+        result = SalonNormalizer(llm).normalize(_raw(price_level="PRICE_LEVEL_EXPENSIVE"))
+        assert result.price_range == "$$$"
+
+    def test_unknown_tier_yields_no_price(self) -> None:
+        llm = FakeLLM(parse_fields={"service_slugs": ["manicure"], "price_tier": "unknown"})
+        result = SalonNormalizer(llm).normalize(_raw())
+        assert result.price_range is None

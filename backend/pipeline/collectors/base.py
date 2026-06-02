@@ -35,7 +35,16 @@ class RawSalon(BaseModel):
     price_level: str | None = None
     # Source category labels (e.g. Google place ``types``).
     types: list[str] = Field(default_factory=list)
-    # Free-text review snippets, used later for AI summarization.
+    # The source's primary category and its human label (e.g. "hair_salon" /
+    # "Salon fryzjerski") — a cleaner service signal than the noisy ``types``.
+    primary_type: str | None = None
+    primary_type_display: str | None = None
+    # Lifecycle status (e.g. Google "OPERATIONAL" / "CLOSED_PERMANENTLY").
+    business_status: str | None = None
+    # Human-readable opening hours, one line per weekday.
+    opening_hours: list[str] = Field(default_factory=list)
+    # Free-text review snippets — the richest signal for service + price
+    # inference and for AI summarization.
     reviews: list[str] = Field(default_factory=list)
     # Any free text describing services (editorial summary, joined types, ...).
     raw_services_text: str | None = None

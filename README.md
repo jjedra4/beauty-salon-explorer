@@ -74,6 +74,79 @@ AI is placed on the task's two hard problems:
 This spans classical ML (embeddings, similarity, vector retrieval, ranking) +
 applied LLM (review extraction, query understanding, summarization).
 
+## How the data is built (methodology)
+
+A four-stage pipeline (`backend/pipeline/`, run via `make pipeline`) turns raw
+Google listings into the clean, enriched seed. Each stage is a separately-tested
+module, and all AI access is injected so the whole flow runs offline with fakes
+in tests.
+
+### 1 · Collection — Google Places API (New)
+
+`GooglePlacesCollector` ([`collectors/google_places.py`](backend/pipeline/collectors/google_places.py))
+fans a **Text Search** across a grid of **18 district centroids × 6 query terms**
+(`fryzjer`, `barber shop`, `salon kosmetyczny`, `paznokcie manicure`, …), pages
+through the results, and de-duplicates by place id within the run. A narrow
+**field mask** keeps each request in one billing tier while pulling everything
+useful in a single call (no per-place Details round-trip):
+
+- identity & contact — name, address, lat/lng, phone, website;
+- signals — `rating`, `userRatingCount`, `types`, `primaryType` /
+  `primaryTypeDisplayName`;
+- **up to 5 full customer reviews** — the richest signal;
+- `businessStatus` (permanently-closed places are dropped) and opening hours.
+
+*Why Google Places?* Official, licensed, the widest field coverage, and a
+reproducible query model. **What probing it taught us:** salons come with rich
+reviews and categories, but `priceLevel`, `priceRange`, `editorialSummary` and
+Google's own AI summaries are **almost always null** for salons — so a real
+service list and a price band have to be *derived*. That is exactly what
+enrichment does.
+
+### 2 · Deduplication — embeddings
+
+The same salon surfaces under several district/query searches. `Deduplicator`
+([`enrichment/deduplicator.py`](backend/pipeline/enrichment/deduplicator.py))
+embeds each salon's `name + address`, clusters entries whose cosine similarity
+exceeds a threshold — guarded by a fuzzy **name** check so two different salons
+at one address aren't merged — and collapses each cluster to a canonical record
+that keeps the most-reviewed entry and remembers the merged source ids.
+
+### 3 · Enrichment — services & price from reviews
+
+`SalonNormalizer` ([`enrichment/normalizer.py`](backend/pipeline/enrichment/normalizer.py))
+is the heart of the data-quality story:
+
+- **District** is resolved deterministically from the address against the 18
+  *dzielnice* — cheap and reliable, no LLM needed.
+- **Services + price tier** come from **one structured LLM call** over the salon's
+  `name + Google categories + customer reviews`. Reviews are what make this work:
+  they name concrete services (*koloryzacja* → `hair-coloring`, *trwała* →
+  `hair-styling`, *fade* → `mens-haircut`) that the coarse `types` never capture.
+  The model maps onto the **fixed taxonomy** and is told to be evidence-based (no
+  assuming a full menu from one mention).
+- **Guardrails:** output is validated against known slugs; a deterministic
+  **primary-type floor** unions in the obvious core service (a `barber_shop`
+  always gets `barber`); `other` is dropped when any specific slug is present.
+- **Price** is inferred from review language *only* — *"przystępne ceny"* → `$`,
+  *"rozsądne"* → `$$`, *"drogo" / "zapłaciłam 400 zł"* → `$$$`, and **left blank
+  when reviews say nothing about price** (honest over guessed). This fills the
+  band Google never provides, so *cheap / mid-range / premium* become searchable.
+
+### 4 · Summarization & search embedding
+
+`ReviewSummarizer` ([`enrichment/summarizer.py`](backend/pipeline/enrichment/summarizer.py))
+condenses up to 10 review snippets into a short **one-line vibe + Pros/Cons**
+blurb — and returns nothing when a salon has no reviews, so the field is honestly
+empty rather than invented. Finally each salon's `name + district + services +
+summary` is embedded with `text-embedding-3-small` into `pgvector`, backing the
+semantic search.
+
+The per-salon LLM calls run **concurrently with retry/backoff**, so enriching
+~2,000 salons takes minutes; the result is exported as the committed seed. On a
+real run this produced an average of **~3.6 services per salon** with under **1%**
+falling back to `other`.
+
 ## Tech stack
 
 | Layer     | Choice                                                                 |

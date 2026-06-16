@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # --- AI providers (optional; app degrades gracefully without them) ---
     openai_api_key: str | None = Field(default=None)
-    openai_chat_model: str = "gpt-4o-mini"
+    openai_chat_model: str = "gpt-5.4-nano"
     openai_embedding_model: str = "text-embedding-3-small"
     google_maps_api_key: str | None = Field(default=None)
 
